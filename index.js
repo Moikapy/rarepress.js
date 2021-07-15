@@ -20,7 +20,7 @@
 *****************************************/
 (() => {
   var root = this
-  if (typeof root.alert !== "undefined") {
+  if (typeof window !== "undefined") {
     Alert = alert
   } else {
     Alert = console.error
@@ -33,12 +33,12 @@
       this.fetch = o.fetch
       this.FormData = o.FormData
     }
-    async sign (message) {
+    async sign(message) {
       try {
         let res = await this.ethereum.request(
           {
             method: 'eth_signTypedData_v4',
-            params: [ this.account, JSON.stringify(message) ],
+            params: [this.account, JSON.stringify(message)],
             from: this.account
           }
         )
@@ -47,7 +47,7 @@
         Alert(e.message)
       }
     }
-    async request(method, path, o, type) {
+    async request(method, path, blob, type) {
       if (method === "GET") {
         let url = (path.startsWith("http") ? path : this.host + path)
         let r = await this.fetch(url).then((res) => {
@@ -58,7 +58,7 @@
         if (type === "blob") {
           let fd = new this.FormData()
           fd.append('file', blob)
-          let r = await this.fetch(this.host + path, {
+          let r = await this.fetch(this.host +path, {
             method: "POST",
             body: fd
           }).then((res) => {
@@ -69,7 +69,7 @@
           let r = await this.fetch(this.host + path, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(o)
+            body: JSON.stringify(blob)
           }).then((res) => {
             return res.json()
           })
@@ -91,18 +91,18 @@
       })
       return tokenId
     }
-    build (body) {
-      let type = (body.supply && body.supply > 1 ? "ERC1155": "ERC721")
+    build(body) {
+      let type = (body.supply && body.supply > 1 ? "ERC1155" : "ERC721")
       if (!body.creators) {
         body.creators = [{ account: this.account, value: 10000 }]
       }
       return this.request("POST", "/token/build", { body, type })
     }
-    send (body, sig) {
+    send(body, sig) {
       return this.request("POST", "/token/send", { body, sig })
     }
-    async create (body) {
-      let type = (body.supply && body.supply > 1 ? "ERC1155": "ERC721")
+    async create(body) {
+      let type = (body.supply && body.supply > 1 ? "ERC1155" : "ERC721")
       let tokenId = await this.init(type)
       body.tokenId = tokenId
       if (!body.metadata.name || body.metadata.name.length === 0) body.metadata.name = ""
@@ -123,7 +123,7 @@
   *********************/
   class VIPFS extends Thing {
     async upload(blob) {
-      let response = await this.request("POST", this.host + "/ipfs/add", blob, "blob")
+      let response = await this.request("POST", "/ipfs/add", blob, "blob")
       return response.cid
     }
     async import(url) {
@@ -149,9 +149,11 @@
         return response.cid
       }
     }
-    async add (buf) {
+    async add(buf) {
       let type = buf.constructor.name;
+      console.log(buf)
       let cid
+      // cid = await this.upload(buf)
       if (type === 'ArrayBuffer') {
         cid = await this.upload(new Blob([buf]))
       } else if (type === "File") {
@@ -180,7 +182,7 @@
       let sent = await this.send(built.original)
       return sent
     }
-    async build (body) {
+    async build(body) {
       // 1. get encoded trade object
       let built = await this.request("POST", "/trade/build", { body })
       // 2. set maker to the original
@@ -188,16 +190,16 @@
       built.encoded.message.maker = this.account
       return built
     }
-    send (body) {
+    send(body) {
       return this.request("POST", "/trade/send", { body })
     }
   }
   class Rarepress {
-    async init (o) {
+    async init(o) {
       if (o.ethereum) {
         this.ethereum = o.ethereum
-      } else if (root.ethereum) {
-        this.ethereum = root.ethereum
+      } else if (typeof ethereum !== "undefined") {
+        this.ethereum = ethereum
       } else {
         Alert("Please install MetaMask from https://metamask.io/")
         return;
@@ -205,7 +207,7 @@
       if (o.http && o.http.fetch) {
         this.fetch = o.http.fetch
       } else {
-        this.fetch = fetch.bind(root)
+        this.fetch = fetch.bind(window)
       }
       if (o.http && o.http.FormData) {
         this.FormData = o.http.FormData
@@ -215,7 +217,7 @@
       let accounts = await this.ethereum.request({ method: 'eth_requestAccounts' });
       let account = accounts[0];
       this.account = account
-      if (!o) o = {host: ""}
+      if (!o) o = { host: "" }
       if (!o.host) o.host = ""
       this.host = o.host
       this.token = new Token({
@@ -258,11 +260,10 @@
     }
   }
   var rarepress = new Rarepress()
-  if(typeof exports !== 'undefined') {
-    if(typeof module !== 'undefined' && module.exports) {
+  if (typeof exports !== 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
       exports = module.exports = rarepress
     }
-    exports.rarepress = rarepress
   } else {
     root.rarepress = rarepress
   }
